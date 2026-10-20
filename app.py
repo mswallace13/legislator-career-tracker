@@ -3,7 +3,6 @@ from flask import Flask, render_template_string, jsonify
 
 app = Flask(__name__)
 
-# Progress API Route
 @app.route('/api/progress')
 def get_progress():
     conn = sqlite3.connect("legislators.db")
@@ -16,8 +15,11 @@ def get_progress():
         SELECT COUNT(DISTINCT l.id) 
         FROM legislators l
         LEFT JOIN education e ON l.id = e.legislator_id
+        LEFT JOIN professions p ON l.id = p.legislator_id
         LEFT JOIN military_service m ON l.id = m.legislator_id
-        WHERE e.legislator_id IS NOT NULL OR m.legislator_id IS NOT NULL
+        WHERE e.legislator_id IS NOT NULL 
+           OR p.legislator_id IS NOT NULL 
+           OR m.legislator_id IS NOT NULL
     """)
     scraped = cursor.fetchone()[0]
     conn.close()
@@ -46,11 +48,11 @@ HTML_TEMPLATE = """
 
         <div class="mb-6 p-4 bg-gray-100 rounded-lg border border-gray-200">
             <div class="flex justify-between mb-1">
-                <span class="text-sm font-semibold text-gray-700">Scraping Progress</span>
-                <span id="progressText" class="text-sm font-medium text-blue-600">0 / 0 (0%)</span>
+                <span class="text-sm font-semibold text-gray-700">Database Status</span>
+                <span id="progressText" class="text-sm font-medium text-blue-600">Static Export Snapshot</span>
             </div>
             <div class="w-full bg-gray-300 rounded-full h-4 overflow-hidden">
-                <div id="progressBar" class="bg-blue-600 h-4 rounded-full transition-all duration-500" style="width: 0%"></div>
+                <div id="progressBar" class="bg-blue-600 h-4 rounded-full transition-all duration-500" style="width: 100%"></div>
             </div>
         </div>
 
@@ -70,7 +72,7 @@ HTML_TEMPLATE = """
                 <tr class="border-b hover:bg-gray-50">
                     <td class="p-3">{{ row[0] }}</td>
                     <td class="p-3 font-semibold">{{ row[1] }}</td>
-                    <td class="p-3">{{ row[2] }}</td>
+                    <td class="p-3">{{ row[2] if row[2] and row[2] != 'Unknown' else 'Unspecified' }}</td>
                     <td class="p-3">{{ row[3] or 'N/A' }}</td>
                     <td class="p-3">{{ row[4] or 'N/A' }}</td>
                     <td class="p-3">{{ row[5] or 'None' }}</td>
@@ -94,8 +96,11 @@ HTML_TEMPLATE = """
                 });
             }
 
-            updateProgress();
-            setInterval(updateProgress, 3000);
+            // Only poll API if running on live Flask backend server
+            if (window.location.protocol !== 'file:' && window.location.hostname !== 'mswallace13.github.io') {
+                updateProgress();
+                setInterval(updateProgress, 3000);
+            }
         });
     </script>
 </body>
